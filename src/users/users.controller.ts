@@ -21,7 +21,7 @@ import type { UserResponse } from '../auth/interfaces/user.interface';
 
 @Controller('users')
 @UseGuards(AuthGuard, RolesGuard)
-@Roles('admin', 'librarian') // Only admin and librarian can manage users
+@Roles('admin', 'librarian')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -75,7 +75,7 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @Roles('admin') // Only admin can delete users
+  @Roles('admin')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {
     await this.usersService.remove(id);
