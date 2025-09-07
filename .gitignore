@@ -58,3 +58,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /scripts
 
 AUTH_API.md
+BORROWINGS_API.md
+
+*.sh
