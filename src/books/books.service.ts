@@ -16,8 +16,24 @@ export class BooksService {
     return { _id: result.insertedId, ...createBookDto };
   }
 
-  async findAll() {
-    return this.collection.find().toArray();
+  async findAll(page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+    const total = await this.collection.countDocuments();
+    const books = await this.collection
+      .find()
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    return {
+      books,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string) {
