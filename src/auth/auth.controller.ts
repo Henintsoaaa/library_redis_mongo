@@ -32,17 +32,34 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() registerDto: RegisterDto) {
-    const user = await this.authService.register(registerDto);
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.register(registerDto);
+
+    // Set session cookie for browser clients
+    if (result.sessionId) {
+      response.cookie('sessionId', result.sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      });
+    }
+
     return {
       success: true,
       message: 'User registered successfully',
+      access_token: result.sessionId, // Use sessionId as access_token for frontend compatibility
       user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
+        id: result.user?._id || '',
+        name: result.user?.name || '',
+        email: result.user?.email || '',
+        phone: result.user?.phone || '',
+        role: result.user?.role || 'user',
+        membershipDate: result.user?.membershipDate?.toISOString(),
+        active: result.user?.active,
       },
     };
   }
@@ -66,14 +83,45 @@ export class AuthController {
       });
     }
 
-    return result;
+    return {
+      success: true,
+      message: 'Login successful',
+      access_token: result.sessionId, // Use sessionId as access_token for frontend compatibility
+      user: {
+        id: result.user?._id || '',
+        name: result.user?.name || '',
+        email: result.user?.email || '',
+        role: result.user?.role || 'user',
+      },
+    };
   }
 
   @Get('profile')
   async getProfile(@CurrentUser() user: UserResponse) {
     return {
       success: true,
-      user,
+      user: {
+        id: user._id?.toString() || '',
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        membershipDate: user.membershipDate?.toISOString(),
+        active: user.active,
+      },
+    };
+  }
+
+  @Get('me')
+  async getCurrentUser(@CurrentUser() user: UserResponse) {
+    return {
+      id: user._id?.toString() || '',
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      membershipDate: user.membershipDate?.toISOString(),
+      active: user.active,
     };
   }
 

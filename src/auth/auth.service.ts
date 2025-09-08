@@ -12,13 +12,16 @@ import { Db } from 'mongodb';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from '../users/users.service';
-import { LoginResponse } from './interfaces/auth.interface';
+import {
+  LoginResponse,
+  RegistrationResponse,
+} from './interfaces/auth.interface';
 import { UserResponse } from './interfaces/user.interface';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly SESSION_EXPIRY = 24 * 60 * 60; // 24 hours in seconds
+  private readonly SESSION_EXPIRY = 24 * 60 * 60;
 
   constructor(
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
@@ -26,9 +29,59 @@ export class AuthService {
     private readonly UsersService: UsersService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<UserResponse> {
+  async register(registerDto: RegisterDto): Promise<RegistrationResponse> {
     try {
-      return await this.UsersService.create(registerDto);
+      // check if user already exists in the database
+      const existingUser = await this.UsersService.findByEmail(
+        registerDto.email,
+      );
+      if (existingUser) {
+        throw new BadRequestException('Email already in use');
+      }
+
+      this.logger.log(`Registering new user: ${registerDto.email}`);
+      const newUser = await this.UsersService.create(registerDto);
+
+      if (!newUser) {
+        throw new BadRequestException('User registration failed');
+      }
+
+      // generate session after successful user creation
+      const sessionId = randomUUID();
+      const sessionData = {
+        userId: newUser._id?.toString() || '',
+        email: newUser.email,
+        role: newUser.role || 'user',
+        createdAt: new Date().toISOString(),
+      };
+
+      await this.redis.setex(
+        `session:${sessionId}`,
+        this.SESSION_EXPIRY,
+        JSON.stringify(sessionData),
+      );
+
+      this.logger.log(`User ${registerDto.email} registered successfully`);
+
+      const validRoles = ['user', 'librarian', 'admin'] as const;
+      const userRole = validRoles.includes(newUser.role as any)
+        ? (newUser.role as 'user' | 'librarian' | 'admin')
+        : 'user'; // default fallback
+
+      return {
+        success: true,
+        message: 'Registration successful',
+        sessionId,
+        user: {
+          _id: newUser._id?.toString() || '',
+          name: newUser.name,
+          email: newUser.email,
+          phone: newUser.phone,
+          role: userRole,
+          membershipDate: newUser.membershipDate,
+          active: newUser.active,
+        },
+      };
     } catch (error) {
       this.logger.error(`Registration failed: ${error.message}`);
       throw error;
@@ -39,24 +92,20 @@ export class AuthService {
     const { email, password } = loginDto;
 
     try {
-      // Find user by email
       const user = await this.UsersService.findByEmail(email);
       if (!user) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      // Check if user is active
       if (!user.active) {
         throw new UnauthorizedException('Account is deactivated');
       }
 
-      // Verify password
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      // Generate session
       const sessionId = randomUUID();
       const sessionData = {
         userId: user._id?.toString() || '',
@@ -65,7 +114,6 @@ export class AuthService {
         createdAt: new Date().toISOString(),
       };
 
-      // Store session in Redis
       await this.redis.setex(
         `session:${sessionId}`,
         this.SESSION_EXPIRY,
@@ -108,12 +156,10 @@ export class AuthService {
       const user = await this.UsersService.findById(session.userId);
 
       if (!user || !user.active) {
-        // Clean up invalid session
         await this.redis.del(`session:${sessionId}`);
         return null;
       }
 
-      // Extend session expiry on each validation
       await this.redis.expire(`session:${sessionId}`, this.SESSION_EXPIRY);
 
       return user;

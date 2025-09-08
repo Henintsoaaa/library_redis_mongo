@@ -26,8 +26,16 @@ export class AuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const sessionId =
+    let sessionId =
       request.headers['x-session-id'] || request.cookies?.sessionId;
+
+    // Also check Authorization header for Bearer token
+    if (!sessionId && request.headers.authorization) {
+      const authHeader = request.headers.authorization;
+      if (authHeader.startsWith('Bearer ')) {
+        sessionId = authHeader.substring(7);
+      }
+    }
 
     if (!sessionId) {
       throw new UnauthorizedException('Session ID required');
