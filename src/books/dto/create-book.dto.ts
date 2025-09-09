@@ -24,4 +24,12 @@ export class CreateBookDto {
   @IsOptional()
   @IsNumber()
   copies?: number;
+
+  @IsOptional()
+  @IsNumber()
+  availableCopies?: number;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
 }

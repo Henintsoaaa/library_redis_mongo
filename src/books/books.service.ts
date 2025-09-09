@@ -12,8 +12,14 @@ export class BooksService {
   }
 
   async create(createBookDto: CreateBookDto) {
-    const result = await this.collection.insertOne(createBookDto);
-    return { _id: result.insertedId, ...createBookDto };
+    const now = new Date();
+    const bookData = {
+      ...createBookDto,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const result = await this.collection.insertOne(bookData);
+    return { _id: result.insertedId, ...bookData };
   }
 
   async findAll(page: number = 1, limit: number = 10) {
@@ -46,7 +52,7 @@ export class BooksService {
     console.log('Updating book with id:', id);
     const result = await this.collection.findOneAndUpdate(
       { _id: new ObjectId(id) },
-      { $set: updateBookDto },
+      { $set: { ...updateBookDto, updatedAt: new Date() } },
       { returnDocument: 'after' },
     );
 
