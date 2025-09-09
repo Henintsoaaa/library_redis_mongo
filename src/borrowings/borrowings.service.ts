@@ -18,14 +18,40 @@ export class BorrowingsService {
 
   constructor(@Inject('MONGO_CLIENT') private db: Db) {}
 
-  async create(createBorrowingDto: CreateBorrowingDto): Promise<Borrowing> {
+  async create(
+    createBorrowingDto: CreateBorrowingDto,
+    currentUser?: any,
+  ): Promise<Borrowing> {
     // Convert string IDs to ObjectId
     const userId = new ObjectId(createBorrowingDto.userId);
     const bookId = new ObjectId(createBorrowingDto.bookId);
 
-    const existingBorrow = await this.findActiveByBookId(bookId);
-    if (existingBorrow) {
-      throw new ConflictException('Book is already borrowed');
+    // Check if user is authorized to borrow for this userId
+    if (
+      currentUser &&
+      currentUser.role !== 'admin' &&
+      currentUser.role !== 'librarian' &&
+      currentUser.id !== createBorrowingDto.userId
+    ) {
+      throw new BadRequestException('You can only borrow books for yourself');
+    }
+
+    // Get the book to check copies
+    const book = await this.db.collection('books').findOne({ _id: bookId });
+    if (!book) {
+      throw new NotFoundException('Book not found');
+    }
+
+    // Count active borrows for this book
+    const activeBorrowsCount = await this.db
+      .collection(this.COLLECTION_NAME)
+      .countDocuments({
+        bookId,
+        status: { $in: ['borrowed', 'overdue'] },
+      });
+
+    if (activeBorrowsCount >= (book.copies || 0)) {
+      throw new ConflictException('No copies available for borrowing');
     }
 
     const overdueBooks = await this.findOverdueByUserId(userId);
@@ -35,9 +61,12 @@ export class BorrowingsService {
       );
     }
 
-    const borrowDate = createBorrowingDto.borrowDate || new Date();
-    const dueDate =
-      createBorrowingDto.dueDate || this.calculateDueDate(borrowDate);
+    const borrowDate = createBorrowingDto.borrowDate
+      ? new Date(createBorrowingDto.borrowDate)
+      : new Date();
+    const dueDate = createBorrowingDto.dueDate
+      ? new Date(createBorrowingDto.dueDate)
+      : this.calculateDueDate(borrowDate);
 
     const borrowing = new Borrowing({
       userId,
@@ -51,6 +80,12 @@ export class BorrowingsService {
     const result = await this.db
       .collection(this.COLLECTION_NAME)
       .insertOne(borrowing);
+
+    // Decrement book copies
+    await this.db
+      .collection('books')
+      .updateOne({ _id: bookId }, { $inc: { copies: -1 } });
+
     return { ...borrowing, _id: result.insertedId };
   }
 
@@ -147,7 +182,9 @@ export class BorrowingsService {
       throw new BadRequestException('Book is already returned');
     }
 
-    const returnDate = returnBookDto.returnDate || new Date();
+    const returnDate = returnBookDto.returnDate
+      ? new Date(returnBookDto.returnDate)
+      : new Date();
     const updateData: Partial<Borrowing> = {
       returnDate,
       status: 'returned',
@@ -156,6 +193,11 @@ export class BorrowingsService {
     await this.db
       .collection(this.COLLECTION_NAME)
       .updateOne({ _id: new ObjectId(id) }, { $set: updateData });
+
+    // Increment book copies
+    await this.db
+      .collection('books')
+      .updateOne({ _id: borrowing.bookId }, { $inc: { copies: 1 } });
 
     return { ...borrowing, ...updateData };
   }
@@ -170,11 +212,20 @@ export class BorrowingsService {
 
     const borrowing = await this.findOne(id);
 
+    // Prepare update data with proper type conversion
+    const updateData: any = {};
+    if (updateBorrowingDto.returnDate) {
+      updateData.returnDate = new Date(updateBorrowingDto.returnDate);
+    }
+    if (updateBorrowingDto.status) {
+      updateData.status = updateBorrowingDto.status;
+    }
+
     await this.db
       .collection(this.COLLECTION_NAME)
-      .updateOne({ _id: new ObjectId(id) }, { $set: updateBorrowingDto });
+      .updateOne({ _id: new ObjectId(id) }, { $set: updateData });
 
-    return { ...borrowing, ...updateBorrowingDto };
+    return { ...borrowing, ...updateData };
   }
 
   async markOverdue(): Promise<number> {

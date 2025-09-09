@@ -25,9 +25,11 @@ export class BorrowingsController {
   constructor(private readonly borrowingsService: BorrowingsService) {}
 
   @Post()
-  @Public()
-  create(@Body() createBorrowingDto: CreateBorrowingDto) {
-    return this.borrowingsService.create(createBorrowingDto);
+  create(
+    @Body() createBorrowingDto: CreateBorrowingDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.borrowingsService.create(createBorrowingDto, user);
   }
 
   @Get()
@@ -55,43 +57,43 @@ export class BorrowingsController {
   }
 
   @Get('user/:userId')
-  @Roles('admin', 'librarian', 'member')
+  @Roles('admin', 'librarian', 'user')
   findByUserId(
     @Param('userId') userId: string,
     @CurrentUser() currentUser: any,
   ) {
-    if (currentUser.role === 'member' && currentUser.id !== userId) {
+    if (currentUser.role === 'user' && currentUser.id !== userId) {
       userId = currentUser.id;
     }
     return this.borrowingsService.findByUserId(userId);
   }
 
   @Get('user/:userId/active')
-  @Roles('admin', 'librarian', 'member')
+  @Roles('admin', 'librarian', 'user')
   findActiveByUserId(
     @Param('userId') userId: string,
     @CurrentUser() currentUser: any,
   ) {
-    if (currentUser.role === 'member' && currentUser.id !== userId) {
+    if (currentUser.role === 'user' && currentUser.id !== userId) {
       userId = currentUser.id;
     }
     return this.borrowingsService.findActiveByUserId(userId);
   }
 
   @Get('my-borrowings')
-  @Roles('member')
+  @Roles('user')
   getMyBorrowings(@CurrentUser() user: any) {
     return this.borrowingsService.findByUserId(user.id);
   }
 
   @Get('my-active-borrowings')
-  @Roles('member')
+  @Roles('user')
   getMyActiveBorrowings(@CurrentUser() user: any) {
     return this.borrowingsService.findActiveByUserId(user.id);
   }
 
   @Get(':id')
-  @Roles('admin', 'librarian', 'member')
+  @Roles('admin', 'librarian', 'user')
   findOne(@Param('id') id: string) {
     return this.borrowingsService.findOne(id);
   }

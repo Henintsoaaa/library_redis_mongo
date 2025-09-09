@@ -31,7 +31,6 @@ export class AuthService {
 
   async register(registerDto: RegisterDto): Promise<RegistrationResponse> {
     try {
-      // check if user already exists in the database
       const existingUser = await this.UsersService.findByEmail(
         registerDto.email,
       );
@@ -46,7 +45,6 @@ export class AuthService {
         throw new BadRequestException('User registration failed');
       }
 
-      // generate session after successful user creation
       const sessionId = randomUUID();
       const sessionData = {
         userId: newUser._id?.toString() || '',
@@ -66,7 +64,7 @@ export class AuthService {
       const validRoles = ['user', 'librarian', 'admin'] as const;
       const userRole = validRoles.includes(newUser.role as any)
         ? (newUser.role as 'user' | 'librarian' | 'admin')
-        : 'user'; // default fallback
+        : 'user';
 
       return {
         success: true,

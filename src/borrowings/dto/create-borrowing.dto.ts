@@ -16,9 +16,9 @@ export class CreateBorrowingDto {
 
   @IsOptional()
   @IsDateString()
-  borrowDate?: Date;
+  borrowDate?: string;
 
   @IsOptional()
   @IsDateString()
-  dueDate?: Date;
+  dueDate?: string;
 }
