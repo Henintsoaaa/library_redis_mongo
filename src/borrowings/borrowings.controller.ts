@@ -62,8 +62,8 @@ export class BorrowingsController {
     @Param('userId') userId: string,
     @CurrentUser() currentUser: any,
   ) {
-    if (currentUser.role === 'user' && currentUser.id !== userId) {
-      userId = currentUser.id;
+    if (currentUser.role === 'user' && currentUser._id.toString() !== userId) {
+      userId = currentUser._id.toString();
     }
     return this.borrowingsService.findByUserId(userId);
   }
@@ -74,8 +74,8 @@ export class BorrowingsController {
     @Param('userId') userId: string,
     @CurrentUser() currentUser: any,
   ) {
-    if (currentUser.role === 'user' && currentUser.id !== userId) {
-      userId = currentUser.id;
+    if (currentUser.role === 'user' && currentUser._id.toString() !== userId) {
+      userId = currentUser._id.toString();
     }
     return this.borrowingsService.findActiveByUserId(userId);
   }
@@ -83,13 +83,13 @@ export class BorrowingsController {
   @Get('my-borrowings')
   @Roles('user')
   getMyBorrowings(@CurrentUser() user: any) {
-    return this.borrowingsService.findByUserId(user.id);
+    return this.borrowingsService.findByUserId(user._id.toString());
   }
 
   @Get('my-active-borrowings')
   @Roles('user')
   getMyActiveBorrowings(@CurrentUser() user: any) {
-    return this.borrowingsService.findActiveByUserId(user.id);
+    return this.borrowingsService.findActiveByUserId(user._id.toString());
   }
 
   @Get(':id')
@@ -99,9 +99,13 @@ export class BorrowingsController {
   }
 
   @Post(':id/return')
-  @Roles('admin', 'librarian')
-  returnBook(@Param('id') id: string, @Body() returnBookDto: ReturnBookDto) {
-    return this.borrowingsService.returnBook(id, returnBookDto);
+  @Roles('user')
+  returnBook(
+    @Param('id') id: string,
+    @Body() returnBookDto: ReturnBookDto,
+    @CurrentUser() currentUser: any,
+  ) {
+    return this.borrowingsService.returnBook(id, returnBookDto, currentUser);
   }
 
   @Patch(':id')

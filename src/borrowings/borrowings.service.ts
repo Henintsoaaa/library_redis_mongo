@@ -31,7 +31,7 @@ export class BorrowingsService {
       currentUser &&
       currentUser.role !== 'admin' &&
       currentUser.role !== 'librarian' &&
-      currentUser.id !== createBorrowingDto.userId
+      currentUser._id.toString() !== createBorrowingDto.userId
     ) {
       throw new BadRequestException('You can only borrow books for yourself');
     }
@@ -81,10 +81,13 @@ export class BorrowingsService {
       .collection(this.COLLECTION_NAME)
       .insertOne(borrowing);
 
-    // Decrement book copies
+    // Decrement book copies and availableCopies
     await this.db
       .collection('books')
-      .updateOne({ _id: bookId }, { $inc: { copies: -1 } });
+      .updateOne(
+        { _id: bookId },
+        { $inc: { copies: -1, availableCopies: -1 } },
+      );
 
     return { ...borrowing, _id: result.insertedId };
   }
@@ -171,12 +174,22 @@ export class BorrowingsService {
   async returnBook(
     id: string,
     returnBookDto: ReturnBookDto,
+    currentUser?: any,
   ): Promise<Borrowing> {
     if (!ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid borrowing ID');
     }
 
     const borrowing = await this.findOne(id);
+
+    // Check if user is authorized to return this book
+    if (
+      currentUser &&
+      currentUser.role === 'user' &&
+      borrowing.userId.toString() !== currentUser._id.toString()
+    ) {
+      throw new BadRequestException('You can only return your own books');
+    }
 
     if (borrowing.status === 'returned') {
       throw new BadRequestException('Book is already returned');
@@ -194,10 +207,13 @@ export class BorrowingsService {
       .collection(this.COLLECTION_NAME)
       .updateOne({ _id: new ObjectId(id) }, { $set: updateData });
 
-    // Increment book copies
+    // Increment book copies and availableCopies
     await this.db
       .collection('books')
-      .updateOne({ _id: borrowing.bookId }, { $inc: { copies: 1 } });
+      .updateOne(
+        { _id: borrowing.bookId },
+        { $inc: { copies: 1, availableCopies: 1 } },
+      );
 
     return { ...borrowing, ...updateData };
   }
