@@ -12,6 +12,7 @@ import {
 import { BooksService } from './books.service';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
+import { SearchBooksDto } from './dto/search-books.dto';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -55,5 +56,17 @@ export class BooksController {
   @Roles('admin', 'librarian')
   remove(@Param('id') id: string) {
     return this.booksService.remove(id);
+  }
+
+  @Get('/search/advanced')
+  @Public()
+  searchAdvanced(@Query() searchDto: SearchBooksDto) {
+    return this.booksService.searchBooksAdvanced(searchDto);
+  }
+
+  @Get('/filtered')
+  @Roles('admin', 'librarian')
+  getBookSpecific() {
+    return this.booksService.getBookSpecific();
   }
 }

@@ -13,7 +13,7 @@ import { Borrowing } from './entities/borrowing.entity';
 
 @Injectable()
 export class BorrowingsService {
-  private readonly COLLECTION_NAME = 'borrows';
+  private readonly COLLECTION_NAME = 'borrowings';
   private readonly DEFAULT_BORROW_DAYS = 14;
 
   constructor(@Inject('MONGO_CLIENT') private db: Db) {}
@@ -308,5 +308,13 @@ export class BorrowingsService {
     const dueDate = new Date(borrowDate);
     dueDate.setDate(dueDate.getDate() + this.DEFAULT_BORROW_DAYS);
     return dueDate;
+  }
+
+  async getSpecific() {
+    const result = await this.db
+      .collection(this.COLLECTION_NAME)
+      .find({})
+      .toArray();
+    return result;
   }
 }
